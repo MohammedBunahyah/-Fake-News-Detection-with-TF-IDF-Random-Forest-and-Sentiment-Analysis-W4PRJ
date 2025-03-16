@@ -11,7 +11,7 @@ from nltk.stem import WordNetLemmatizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier
 
-# ✅ Fix: Ensure required NLTK resources are downloaded
+# ✅ Ensure required NLTK resources are downloaded
 nltk.download("punkt")
 nltk.download("stopwords")
 nltk.download("wordnet")
@@ -31,14 +31,14 @@ def download_csv_from_gdrive(file_id, output_path):
 df = download_csv_from_gdrive(DATA_FILE_ID, "data.csv")
 val_df = download_csv_from_gdrive(VALIDATION_FILE_ID, "validation_data.csv")
 
-# ✅ Display dataset overview
-st.title("📰 Fake News Detection App")
-st.write("### Dataset Overview:")
-st.dataframe(df[['label', 'title', 'text']].head())
+# ✅ Ensure column names exist
+if "title" not in df.columns or "text" not in df.columns:
+    st.error("❌ Error: The dataset does not have 'title' or 'text' columns!")
+    st.stop()
 
-# ✅ Text preprocessing function
+# ✅ Text Preprocessing Function
 def clean_text(text):
-    text = text.lower()
+    text = str(text).lower()
     text = re.sub(r"\d+", "", text)
     text = re.sub(r"[^\w\s]", "", text)
     text = re.sub(r"\s+", " ", text).strip()
@@ -50,6 +50,15 @@ def clean_text(text):
 # ✅ Initialize NLP tools
 stop_words = set(stopwords.words("english"))
 lemmatizer = WordNetLemmatizer()
+
+# ✅ Apply preprocessing (Fix missing "cleaned_text" column)
+df["cleaned_text"] = df["title"] + " " + df["text"]
+df["cleaned_text"] = df["cleaned_text"].apply(clean_text)
+
+# ✅ Display dataset overview
+st.title("📰 Fake News Detection App")
+st.write("### Dataset Overview:")
+st.dataframe(df[['label', 'title', 'text']].head())
 
 # ✅ Vectorize text using TF-IDF
 vectorizer = TfidfVectorizer(max_features=10000)
@@ -73,4 +82,3 @@ if st.button("Check News"):
         st.success("📰 This is **Real News**!")
     else:
         st.error("🚨 This is **Fake News**!")
-
