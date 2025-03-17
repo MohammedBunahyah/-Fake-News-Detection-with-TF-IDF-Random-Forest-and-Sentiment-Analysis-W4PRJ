@@ -9,10 +9,19 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 
-# 🔧 Fix missing NLTK resources
+# 🔧 Ensure required NLTK resources are downloaded
 nltk.download("punkt")
 nltk.download("stopwords")
 nltk.download("wordnet")
+
+# 🔄 Reload NLTK resources after downloading
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+
+# ✅ Re-import after downloads to ensure functionality
+stop_words = set(stopwords.words("english"))
+lemmatizer = WordNetLemmatizer()
 
 # 🛠 Google Drive File IDs
 MODEL_FILE_ID = "1431m5bn3RJ0SAOpy3zuRRPJMW_LwpVBo"  # Replace with your model file ID
