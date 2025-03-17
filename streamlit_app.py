@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import joblib
 import gdown
+import os
 import nltk
 import re
 import string
@@ -13,18 +14,17 @@ from nltk.stem import WordNetLemmatizer
 nltk.download("punkt")
 nltk.download("stopwords")
 nltk.download("wordnet")
+nltk.download("omw-1.4")  # Fixes certain lemmatizer issues
+nltk.download("averaged_perceptron_tagger")  # Helps with tokenization errors
 
-# 🔄 Reload NLTK resources after downloading
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
-
-# ✅ Re-import after downloads to ensure functionality
+# ✅ Load NLTK components
 stop_words = set(stopwords.words("english"))
 lemmatizer = WordNetLemmatizer()
 
-# 🛠 Google Drive File IDs
-DATA_FILE_ID = "1AsdUWNsA981I0GXty9r345IBC4Ly_D1X"  # Your data.csv file ID
+# 🛠 Google Drive File IDs (Replace these with your actual Google Drive file IDs)
+MODEL_FILE_ID = "1431m5bn3RJ0SAOpy3zuRRPJMW_LwpVBo"  # Your model file ID
+VECTORIZER_FILE_ID = "1HliHGc-mq_q3CvAVzkKrubUv61S8I2Bp"  # Your vectorizer file ID
+DATA_FILE_ID = "1AsdUWNsA981I0GXty9r345IBC4Ly_D1X"  # Your dataset file ID
 
 # 📥 Function to download files from Google Drive
 @st.cache_data
@@ -37,17 +37,27 @@ def download_from_gdrive(file_id, output_path):
 model_path = download_from_gdrive(MODEL_FILE_ID, "random_forest_model.pkl")
 vectorizer_path = download_from_gdrive(VECTORIZER_FILE_ID, "tfidf_vectorizer.pkl")
 
-model = joblib.load(model_path)
-vectorizer = joblib.load(vectorizer_path)
+# 🔍 Check if files exist before loading
+if not os.path.exists(model_path):
+    st.error("🚨 Model file not found! Check Google Drive file ID or upload manually.")
+else:
+    model = joblib.load(model_path)
+
+if not os.path.exists(vectorizer_path):
+    st.error("🚨 Vectorizer file not found! Check Google Drive file ID or upload manually.")
+else:
+    vectorizer = joblib.load(vectorizer_path)
 
 # ✅ Load Dataset for Display (Optional)
 data_path = download_from_gdrive(DATA_FILE_ID, "data.csv")
-df = pd.read_csv(data_path)
+
+if os.path.exists(data_path):
+    df = pd.read_csv(data_path)
+else:
+    st.error("🚨 Dataset file not found! Check Google Drive file ID or upload manually.")
+    df = pd.DataFrame()  # Create empty DataFrame to prevent errors
 
 # 🔎 Preprocessing Function
-stop_words = set(stopwords.words("english"))
-lemmatizer = WordNetLemmatizer()
-
 def clean_text(text):
     text = text.lower()
     text = re.sub(r"\d+", "", text)  # Remove numbers
@@ -62,17 +72,23 @@ def clean_text(text):
 st.title("📰 Fake News Detection App")
 
 st.write("### Dataset Overview:")
-st.write(df.head())  # Show first rows of dataset
+if not df.empty:
+    st.write(df.head())  # Show first rows of dataset
+else:
+    st.write("No dataset available.")
 
 # 📝 User Input
 user_input = st.text_area("Enter a news headline or article:")
 
 if st.button("Check News"):
-    cleaned_input = clean_text(user_input)  # Clean input text
-    input_vector = vectorizer.transform([cleaned_input])  # Convert text to TF-IDF
-    
-    prediction = model.predict(input_vector)[0]  # Predict
-    
-    # 🎯 Show result
-    st.write("### Prediction:")
-    st.success("✅ Real News") if prediction == 1 else st.error("🚨 Fake News")
+    if not user_input.strip():
+        st.warning("⚠️ Please enter a news headline or article.")
+    else:
+        cleaned_input = clean_text(user_input)  # Clean input text
+        input_vector = vectorizer.transform([cleaned_input])  # Convert text to TF-IDF
+        
+        prediction = model.predict(input_vector)[0]  # Predict
+        
+        # 🎯 Show result
+        st.write("### Prediction:")
+        st.success("✅ Real News") if prediction == 1 else st.error("🚨 Fake News")
