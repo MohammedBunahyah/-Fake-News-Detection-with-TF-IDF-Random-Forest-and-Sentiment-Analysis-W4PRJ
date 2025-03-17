@@ -1,80 +1,70 @@
 import streamlit as st
 import pandas as pd
 import joblib
-import gdown
-import nltk
+from sklearn.feature_extraction.text import TfidfVectorizer
 import re
-import string
+import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 
-# 🔧 Ensure required NLTK resources are downloaded
-nltk.download("punkt")
-nltk.download("stopwords")
-nltk.download("wordnet")
+# Download necessary NLTK resources
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('wordnet')
 
-# 🔄 Reload NLTK resources after downloading
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
+# Load model and vectorizer
+@st.cache_resource
+def load_model():
+    return joblib.load("model.pkl")
 
-# ✅ Re-import after downloads to ensure functionality
-stop_words = set(stopwords.words("english"))
-lemmatizer = WordNetLemmatizer()
+@st.cache_resource
+def load_vectorizer():
+    return joblib.load("vectorizer.pkl")
 
-# 🛠 Google Drive File IDs
-MODEL_FILE_ID = "1431m5bn3RJ0SAOpy3zuRRPJMW_LwpVBo"  # Replace with your model file ID
-VECTORIZER_FILE_ID = "1HliHGc-mq_q3CvAVzkKrubUv61S8I2Bp"  # Replace with your vectorizer file ID
-DATA_FILE_ID = "1AsdUWNsA981I0GXty9r345IBC4Ly_D1X"  # Your data.csv file ID
+model = load_model()
+vectorizer = load_vectorizer()
 
-# 📥 Function to download files from Google Drive
-@st.cache_data
-def download_from_gdrive(file_id, output_path):
-    url = f"https://drive.google.com/uc?id={file_id}"
-    gdown.download(url, output_path, quiet=False)
-    return output_path
-
-# ✅ Download and Load Model & Vectorizer
-model_path = download_from_gdrive(MODEL_FILE_ID, "random_forest_model.pkl")
-vectorizer_path = download_from_gdrive(VECTORIZER_FILE_ID, "tfidf_vectorizer.pkl")
-
-model = joblib.load(model_path)
-vectorizer = joblib.load(vectorizer_path)
-
-# ✅ Load Dataset for Display (Optional)
-data_path = download_from_gdrive(DATA_FILE_ID, "data.csv")
-df = pd.read_csv(data_path)
-
-# 🔎 Preprocessing Function
-stop_words = set(stopwords.words("english"))
-lemmatizer = WordNetLemmatizer()
-
+# Text Preprocessing Function
 def clean_text(text):
     text = text.lower()
-    text = re.sub(r"\d+", "", text)  # Remove numbers
-    text = re.sub(r"[^\w\s]", "", text)  # Remove punctuation
-    text = re.sub(r"\s+", " ", text).strip()  # Remove extra spaces
-    tokens = word_tokenize(text)
+    text = re.sub(r'\d+', '', text)  # Remove numbers
+    text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation
+    text = re.sub(r'\s+', ' ', text).strip()  # Remove extra spaces
+    tokens = word_tokenize(text)  # Tokenization
+    stop_words = set(stopwords.words('english'))
+    lemmatizer = WordNetLemmatizer()
     tokens = [word for word in tokens if word not in stop_words]
     tokens = [lemmatizer.lemmatize(word) for word in tokens]
     return " ".join(tokens)
 
-# 🌐 Streamlit App UI
-st.title("📰 Fake News Detection App")
+# Streamlit UI
+st.title("Fake News Detection App")
+st.write("Enter a news article title and text below to classify it as **Real or Fake**.")
 
-st.write("### Dataset Overview:")
-st.write(df.head())  # Show first rows of dataset
+# User Input
+title = st.text_input("Enter News Title:")
+text = st.text_area("Enter News Content:")
 
-# 📝 User Input
-user_input = st.text_area("Enter a news headline or article:")
+if st.button("Predict"):
+    if title and text:
+        combined_text = clean_text(title + " " + text)
+        transformed_text = vectorizer.transform([combined_text])
+        prediction = model.predict(transformed_text)[0]
+        result = "Real News ✅" if prediction == 1 else "Fake News ❌"
+        st.subheader(f"Prediction: {result}")
+    else:
+        st.warning("Please enter both a title and content.")
 
-if st.button("Check News"):
-    cleaned_input = clean_text(user_input)  # Clean input text
-    input_vector = vectorizer.transform([cleaned_input])  # Convert text to TF-IDF
-    
-    prediction = model.predict(input_vector)[0]  # Predict
-    
-    # 🎯 Show result
-    st.write("### Prediction:")
-    st.success("✅ Real News") if prediction == 1 else st.error("🚨 Fake News")
+# Upload CSV for Batch Predictions
+st.subheader("Upload CSV for Bulk Predictions")
+uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
+if uploaded_file:
+    df = pd.read_csv(uploaded_file)
+    df['cleaned_text'] = df['title'] + " " + df['text']
+    df['cleaned_text'] = df['cleaned_text'].apply(clean_text)
+    df_tfidf = vectorizer.transform(df['cleaned_text'])
+    df['label'] = model.predict(df_tfidf)
+    df['label'] = df['label'].apply(lambda x: 0 if x == 2 else x)
+    st.write(df[['title', 'label']])
+    st.download_button("Download Predictions", df.to_csv(index=False), "predictions.csv")
