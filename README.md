@@ -1,3 +1,4 @@
+🚀 Fake News Detection with TF-IDF, Random Forest, and Sentiment Analysis
 This project builds a Fake News Classifier using TF-IDF, Random Forest, and explores additional text analysis techniques like sentiment scoring, word clouds, and model comparisons.
 
 📚 Project Overview
